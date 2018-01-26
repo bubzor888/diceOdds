@@ -1,22 +1,41 @@
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class DiceOdds {
 
-  private static final int NUM_OF_DICE = 2;
+  private static final boolean ADD_DICE = true;
+
+  enum Dice {
+    SIDE_ONE(DiceType.FAIL, 1), SIDE_TWO(DiceType.FAIL, 0), SIDE_THREE(DiceType.SPECIAL,
+            0), SIDE_FOUR(DiceType.SUCCESS,
+            1), SIDE_FIVE(DiceType.SUCCESS, 1), SIDE_SIX(DiceType.SUCCESS, 1);
+
+    private DiceType diceType;
+    private int damage;
+
+    Dice(DiceType diceType, int damage) {
+      this.diceType = diceType;
+      this.damage = damage;
+    }
+
+    public DiceType getDiceType() {
+      return diceType;
+    }
+
+    public int getDamage() {
+      return damage;
+    }
+  }
 
   public static void main(String[] args) {
+    for (int i=1; i<5; i++) {
+      rollDice(i);
+    }
+  }
 
-    int numberOfDice = NUM_OF_DICE;
-    BigInteger totalPossibilities = BigInteger.valueOf(Dice.values().length);
-    totalPossibilities = totalPossibilities.pow(numberOfDice);
-
-    System.out.println("Calculating the odds of " + totalPossibilities + " rolls.");
-
+  private static void rollDice(int numberOfDice) {
+    System.out.println("Rolling for " + numberOfDice + " dice");
     // Get a set of dice all set to the 0 side
     int[] dice = setupDice(numberOfDice);
     Result result = new Result();
@@ -36,7 +55,7 @@ public class DiceOdds {
       } else {
         // We need to find the right dice to increment
         int nextDice = -1;
-        for (int i = 1; i < NUM_OF_DICE; i++) {
+        for (int i = 1; i < numberOfDice; i++) {
           if (dice[i] + 1 < Dice.values().length) {
             nextDice = i;
             break;
@@ -80,7 +99,7 @@ public class DiceOdds {
           special = true;
           break;
         case FAIL:
-          failures++;
+          failures+= dice.getDamage();
           break;
         case SUCCESS:
           successes.add(dice.getDamage());
@@ -98,16 +117,19 @@ public class DiceOdds {
         successes.remove(successes.size() - 1);
       }
 
-      int bestResult = successes.get(successes.size() - 1);
-      if (bestResult == 3) {
-        result.threeDamage(special);
-      } else if (bestResult == 2) {
-        result.twoDamage(special);
+      if (ADD_DICE) {
+        //We will add the results this time
+        int total = 0;
+        for (Integer success : successes) {
+          total += success;
+        }
+        result.addResult(total, special);
       } else {
-        result.oneDamage(special);
+        //Take only the highest damage
+        result.addResult(successes.get(successes.size() - 1), special);
       }
     } else {
-      result.failure();
+      result.addResult(0, false);
     }
 
     return result;
@@ -117,88 +139,83 @@ public class DiceOdds {
 
 class Result {
   private BigDecimal totalAttempts = new BigDecimal(0);
-  private BigDecimal fail = new BigDecimal(0);
-  private BigDecimal oneDamage = new BigDecimal(0);
-  private BigDecimal oneDamageSpecial = new BigDecimal(0);
-  private BigDecimal twoDamage = new BigDecimal(0);
-  private BigDecimal twoDamageSpecial = new BigDecimal(0);
-  private BigDecimal threeDamage = new BigDecimal(0);
-  private BigDecimal threeDamageSpecial = new BigDecimal(0);
 
-  private final BigDecimal ONE = new BigDecimal(1);
+  Map<Integer, BigDecimal> damage = new HashMap<Integer, BigDecimal>();
+  Map<Integer, BigDecimal> special = new HashMap<Integer, BigDecimal>();
 
-  public void failure() {
-    fail = fail.add(ONE);
-    totalAttempts = totalAttempts.add(ONE);
-  }
+  private final BigDecimal ONE = new BigDecimal("1");
 
-
-  public void oneDamage(boolean special) {
-    if (special) {
-      oneDamageSpecial = oneDamageSpecial.add(ONE);
+  public void addResult(Integer amount, boolean isSpecial) {
+    if (damage.get(amount) != null) {
+      damage.put(amount, damage.get(amount).add(ONE));
+    } else {
+      damage.put(amount, ONE);
     }
-    oneDamage = oneDamage.add(ONE);
 
-    totalAttempts = totalAttempts.add(ONE);
-  }
-
-  public void twoDamage(boolean special) {
-    if (special) {
-      twoDamageSpecial = twoDamageSpecial.add(ONE);
+    if (isSpecial) {
+      if (special.get(amount) != null) {
+        special.put(amount, special.get(amount).add(ONE));
+      } else {
+        special.put(amount, ONE);
+      }
     }
-    twoDamage = twoDamage.add(ONE);
-    totalAttempts = totalAttempts.add(ONE);
-  }
 
-  public void threeDamage(boolean special) {
-    if (special) {
-      threeDamageSpecial = threeDamageSpecial.add(ONE);
-    }
-    threeDamage = threeDamage.add(ONE);
     totalAttempts = totalAttempts.add(ONE);
-  }
-
-  private BigDecimal calculatePercent(BigDecimal subtotal) {
-    return subtotal.divide(totalAttempts, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
-        .setScale(2);
   }
 
   public void print() {
-    System.out.print(new StringBuilder("Results:\n").append("\tFailure: ")
-        .append(calculatePercent(fail)).append("%\n").append("\tOne Damage: ")
-        .append(calculatePercent(oneDamage)).append("%, with special: ")
-        .append(calculatePercent(oneDamageSpecial)).append("%\n").append("\tTwo Damage: ")
-        .append(calculatePercent(twoDamage)).append("%, with special: ")
-        .append(calculatePercent(twoDamageSpecial)).append("%\n").append("\tThree Damage: ")
-        .append(calculatePercent(threeDamage)).append("%, with special: ")
-        .append(calculatePercent(threeDamageSpecial)).append("%").toString());
+    StringBuilder sb = new StringBuilder("Made ").append(totalAttempts).append(" rolls:\n");
+
+    for (Map.Entry<Integer, BigDecimal> entry : damage.entrySet()) {
+      if (entry.getValue() != null) {
+//        sb.append(entry.getKey()).append(" damage results: ").append(calculatePercent(entry.getValue())).append("%");
+//
+//        if (special.get(entry.getKey()) != null) {
+//          sb.append(" (special: ").append(calculatePercent(special.get(entry.getKey()))).append("%)");
+//        } else {
+//          sb.append(" (special: 0%)");
+//        }
+//        sb.append(" | ");
+        if (entry.getKey() == 0) {
+          sb.append("0 damage: ").append(calculatePercent(entry.getValue())).append("%");
+        } else {
+          sb.append(entry.getKey()).append(" damage or more: ")
+                  .append(calculatePercent(atLeast(entry.getKey(), damage))).append("%");
+
+          if (special.get(entry.getKey()) != null) {
+            sb.append(" (special: ").append(calculatePercent(atLeast(entry.getKey(), special))).append("%)");
+          } else {
+            sb.append(" (special: 0%)");
+          }
+        }
+
+        sb.append("\n");
+      }
+    }
+
+    System.out.println(sb.toString());
+  }
+
+  private BigDecimal calculatePercent(BigDecimal amount) {
+    return amount.divide(totalAttempts, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
+            .setScale(2);
+  }
+
+  private BigDecimal atLeast(Integer amount, Map<Integer, BigDecimal> map) {
+    BigDecimal total = new BigDecimal("0");
+    for (Map.Entry<Integer, BigDecimal> entry : map.entrySet()) {
+      if (entry.getKey().compareTo(amount) >= 0 && entry.getValue() != null) {
+        total = total.add(entry.getValue());
+      }
+    }
+    return total;
   }
 }
 
 
 enum DiceType {
-  FAIL, NOTHING, SPECIAL, SUCCESS;
+  FAIL, SPECIAL, SUCCESS;
 }
 
 
-enum Dice {
-  SIDE_ONE(DiceType.FAIL, 0), SIDE_TWO(DiceType.SPECIAL, 0), SIDE_THREE(DiceType.NOTHING,
-      0), SIDE_FOUR(DiceType.SUCCESS,
-          1), SIDE_FIVE(DiceType.SUCCESS, 2), SIDE_SIX(DiceType.SUCCESS, 3);
 
-  private DiceType diceType;
-  private int damage;
-
-  private Dice(DiceType diceType, int damage) {
-    this.diceType = diceType;
-    this.damage = damage;
-  }
-
-  public DiceType getDiceType() {
-    return diceType;
-  }
-
-  public int getDamage() {
-    return damage;
-  }
-}
