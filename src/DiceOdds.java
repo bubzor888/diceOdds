@@ -1,12 +1,13 @@
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class DiceOdds {
 
-  private static final int NUM_OF_DICE = 3;
+  private static final int NUM_OF_DICE = 2;
 
   public static void main(String[] args) {
 
@@ -21,8 +22,6 @@ public class DiceOdds {
     Result result = new Result();
 
     while (true) {
-      System.out.println("[" + dice[0] + "," + dice[1] + "," + dice[2] + "]");
-
       // Need to make a "roll" with each side of the dice
       List<Dice> roll = new ArrayList<Dice>();
       for (int i = 0; i < dice.length; i++) {
@@ -137,40 +136,42 @@ class Result {
   public void oneDamage(boolean special) {
     if (special) {
       oneDamageSpecial = oneDamageSpecial.add(ONE);
-    } else {
-      oneDamage = oneDamage.add(ONE);
     }
+    oneDamage = oneDamage.add(ONE);
+
     totalAttempts = totalAttempts.add(ONE);
   }
 
   public void twoDamage(boolean special) {
     if (special) {
       twoDamageSpecial = twoDamageSpecial.add(ONE);
-    } else {
-      twoDamage = twoDamage.add(ONE);
     }
+    twoDamage = twoDamage.add(ONE);
     totalAttempts = totalAttempts.add(ONE);
   }
 
   public void threeDamage(boolean special) {
     if (special) {
       threeDamageSpecial = threeDamageSpecial.add(ONE);
-    } else {
-      threeDamage = threeDamage.add(ONE);
     }
+    threeDamage = threeDamage.add(ONE);
     totalAttempts = totalAttempts.add(ONE);
   }
 
-  public String print() {
-    return new StringBuilder("Results:\n").append("\tFailure: ")
-        .append(fail.divide(totalAttempts).setScale(2)).append("%\n").append("\tOne Damage: ")
-        .append(oneDamage.divide(totalAttempts).setScale(2)).append("%, with special: ")
-        .append(oneDamageSpecial.divide(totalAttempts).setScale(2)).append("%\n")
-        .append("\tTwo Damage: ").append(twoDamage.divide(totalAttempts).setScale(2))
-        .append("%, with special: ").append(twoDamageSpecial.divide(totalAttempts).setScale(2))
-        .append("%\n").append("\tThree Damage: ")
-        .append(threeDamage.divide(totalAttempts).setScale(2)).append("%, with special: ")
-        .append(threeDamageSpecial.divide(totalAttempts).setScale(2)).append("%").toString();
+  private BigDecimal calculatePercent(BigDecimal subtotal) {
+    return subtotal.divide(totalAttempts, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
+        .setScale(2);
+  }
+
+  public void print() {
+    System.out.print(new StringBuilder("Results:\n").append("\tFailure: ")
+        .append(calculatePercent(fail)).append("%\n").append("\tOne Damage: ")
+        .append(calculatePercent(oneDamage)).append("%, with special: ")
+        .append(calculatePercent(oneDamageSpecial)).append("%\n").append("\tTwo Damage: ")
+        .append(calculatePercent(twoDamage)).append("%, with special: ")
+        .append(calculatePercent(twoDamageSpecial)).append("%\n").append("\tThree Damage: ")
+        .append(calculatePercent(threeDamage)).append("%, with special: ")
+        .append(calculatePercent(threeDamageSpecial)).append("%").toString());
   }
 }
 
